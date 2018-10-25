@@ -1,0 +1,30 @@
+theme = "hyde"
+baseURL = "/"
+languageCode = "en-us"
+title = "/dion/blog"
+ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_files$", "_cache$"]
+
+
+[params]
+  themeColor = "theme-base-0d"
+  description = "EEG, Python, R analysings, these are a few of my favourite things. I don't really know stuff, but I try."
+
+[[menu.main]]
+    name = "Posts"
+    url = "/post/"
+    weight = 2
+    
+[[menu.main]]
+    name = "About"
+    url = "/about"
+    weight = 3
+    
+[[menu.main]]
+    name = "GitHub"
+    url = "https://github.com/DTHenare"
+    weight = 4
+    
+[[menu.main]]
+    name = "Twitter"
+    url = "https://twitter.com/dionhenare"
+    weight = 5
