@@ -16,7 +16,113 @@ Description: ''
 Tags:
   - Development
   - golang
-menu: main
 ---
 
-What I want to do more than anything else in the world, is analyse ERP data using R.
+What I want to do more than anything else in the world, is analyse ERP data using R. The details of what I want to do are still a little murky, but first things first, I need data. What I'm going to do in this post is outline an ERP dataset that I think will work well in R, and retains lots of information so that I can run all kinds of cockamamey analyses later on.
+
+The first problem I had was that my background is mostly in Matlab. This is a problem for many reasons but for today I'm going to focus on how eeglab represents ERP data. In eeglab the voltages are stored in a 2 or 3 dimensional matrix (depending on whether you've epoched), with all of the additional information like time points, channels, and event labels stored in different variables. I'm pretty comfortable using the data that way but I don't think that's how R likes things. So after thinking a little bit about about what would make R feel comfrotable, I think I'm going to try and represent my ERP data in longtable format. It'll be one big table holding all of the useful information, with column headings looking something like this:
+
+```{r echo=FALSE}
+knitr::kable(setNames(data.frame(matrix(ncol = 6, nrow = 0)), c("Voltage", "Timepoint", "Channel", "Event", "Participant", "TrialNumber")), format="html")
+```
+
+I have an inkling that I'm underestimating how long this longtable is actually gong to be, so I may end up having to make one for each participant but we'll see how we go!
+
+
+Let's start with a simulation:
+```{R}
+library(eegkit)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+channel <- "P8"
+srate <- 250
+timepoints <- seq(-0.2,0.5,by=(1/srate))
+subj=1
+
+ERPdata <- data.frame(matrix(ncol = 4, nrow = 0))
+colnames(ERPdata) <- c("Subject", "Condition", "timepoints", "voltages")
+
+sim1 <- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,1,1,1), tshift = rep(0,5))
+sim2 <- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,40,1,1), tshift = rep(0,5))
+
+erp1 <- data.frame(Subject = as.character(subj), Condition = "Contra", timepoints=timepoints, voltages =sim1)
+erp2 <- data.frame(Subject = as.character(subj), Condition = "Ipsi", timepoints=timepoints, voltages =sim2)
+ERPdata <- rbind(erp1,erp2)
+
+
+ERPdata %>%
+  ggplot(., aes(x=timepoints, y=voltages, colour = Condition)) +
+  scale_y_reverse() +
+  geom_line()
+
+
+ERPdata %>%
+  spread(Condition, voltages) %>%
+  mutate(diff = Contra-Ipsi) %>%
+  ggplot(., aes(x=timepoints, y=diff)) +
+  scale_y_reverse() +
+  geom_line()
+```
+
+```{r }
+library(eegkit)
+library(ggplot2)
+library(tuneR)
+
+channel <- "P8"
+srate <- 250
+timepoints <- seq(-0.2,0.5,by=(1/srate))
+
+ERPdata <- data.frame(matrix(ncol = 4, nrow = 0))
+colnames(ERPdata) <- c("Subject", "Condition", "timepoints", "voltages")
+for (subj in c(1:10)) {
+  subjCoefs = runif(1, min=-0.5, max=1.5)
+sim1 <- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,1,1,1)*subjCoefs, tshift = rep(0,5)) + noise(kind = c("red"), duration = length(timepoints), bit = 64)@left*5#rnorm(length(timepoints))*2
+sim2 <- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,1,1,3)*subjCoefs, tshift = rep(0,5)) + noise(kind = c("red"), duration = length(timepoints), bit = 64)@left*5#rnorm(length(timepoints))*2
+
+erp1 <- data.frame(Subject = as.character(subj), Condition = "One", timepoints=timepoints, voltages =sim1)
+erp2 <- data.frame(Subject = as.character(subj), Condition = "Two", timepoints=timepoints, voltages =sim2)
+ERPdata <- rbind(ERPdata,erp1,erp2)
+}
+
+ERPdata %>%
+  ggplot(., aes(x=timepoints, y=voltages, colour = Subject)) +
+  geom_line() +
+  facet_grid(Condition~.)
+
+ERPdata %>%
+  group_by(timepoints, Condition) %>%
+  summarise(voltages = mean(voltages)) %>%
+  ggplot(., aes(x=timepoints, y=voltages, colour = Condition)) +
+  geom_line() 
+
+#eegkitdata::geteegdata(indir="C:/Users/dionh/Documents/EEG data/SMNI_CMI_TRAIN/",outdir="C:/Users/dionh/Documents/EEG data/", cond="S1",filename="eegtrainS1")
+```
+I'm just going to start by announcing that I don't know very much about R. If you do, this will probably become obvious to you as you read what I do but at least for now, I'm going to try and represent my ERP data in a long table.
+
+
+I have a pile of data that I collected a few years ago which will be perfect for this. You may be thinking, "well if you've got all of the raw data then just load that into R and do everything there.", and if you are thinking that, then you're crazy. While it is technically possible to load raw EEG data into R and perform most preprocessing steps, at this stage you're on a very steep hill pushing a very heavy boulder. Personally, I'm not enough of a sadist for that. What I'm going to do is tidy all of the data up using eeglab, and then create a text file which will hold all of the single trial epochs, and all channels, for all condiitons and participants.
+
+The basic pipeline I like looks like this:
+- filter
+- interpolate bad channels
+- re-reference
+- remove epochs with large artefacts (to improve ICA decomposition)
+- run ICA using the pca option to reduce to 32 components
+- reject epochs with problematic horizontal eye movements (especially important for my paradigm that these are not just corrected by ICA)
+- reject artefact ICA components
+- throw away any noisy epochs that remain (+/- 100)
+
+One thing that I don't like about this is that you end up with different trial numbers per person, per condition. I think I would prefer to use a pipeline that cleans the epochs as much as possible, but doesn't throw anything out before it is loaded in R. I'll do some simple epoch rejection in R when needed. This means that I end up with a slightly convoluted pipeline but it gives me something a little more flexible down the line.
+
+The new pipeline looks like this:
+- filter
+- interpolate bad channels
+- re-reference
+- remove epochs with large artefacts but store these so they can be added back later. It's still necessary to do this step in order to improve the ICA decomposition.
+- run ICA using the pca option to reduce to 32 components
+- Store the HEOG for each trial. This is still necessary to do because of my paradigm, and I won't be able to get this information from the HEOG later because ICA is about to clean the data, probably throwing out HEOG activity in the process.
+- reject artefact ICA components
+

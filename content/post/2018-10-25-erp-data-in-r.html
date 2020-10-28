@@ -16,9 +16,147 @@ Description: ''
 Tags:
   - Development
   - golang
-menu: main
 ---
 
 
 
-<p>What I want to do more than anything else in the world, is analyse ERP data using R.</p>
+<p>What I want to do more than anything else in the world, is analyse ERP data using R. The details of what I want to do are still a little murky, but first things first, I need data. What I’m going to do in this post is outline an ERP dataset that I think will work well in R, and retains lots of information so that I can run all kinds of cockamamey analyses later on.</p>
+<p>The first problem I had was that my background is mostly in Matlab. This is a problem for many reasons but for today I’m going to focus on how eeglab represents ERP data. In eeglab the voltages are stored in a 2 or 3 dimensional matrix (depending on whether you’ve epoched), with all of the additional information like time points, channels, and event labels stored in different variables. I’m pretty comfortable using the data that way but I don’t think that’s how R likes things. So after thinking a little bit about about what would make R feel comfrotable, I think I’m going to try and represent my ERP data in longtable format. It’ll be one big table holding all of the useful information, with column headings looking something like this:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left;">
+Voltage
+</th>
+<th style="text-align:left;">
+Timepoint
+</th>
+<th style="text-align:left;">
+Channel
+</th>
+<th style="text-align:left;">
+Event
+</th>
+<th style="text-align:left;">
+Participant
+</th>
+<th style="text-align:left;">
+TrialNumber
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+</tr>
+</tbody>
+</table>
+<p>I have an inkling that I’m underestimating how long this longtable is actually gong to be, so I may end up having to make one for each participant but we’ll see how we go!</p>
+<p>Let’s start with a simulation:</p>
+<pre class="r"><code>library(eegkit)</code></pre>
+<pre><code>## Loading required package: eegkitdata</code></pre>
+<pre><code>## Loading required package: bigsplines</code></pre>
+<pre><code>## Loading required package: quadprog</code></pre>
+<pre><code>## Loading required package: ica</code></pre>
+<pre><code>## Loading required package: rgl</code></pre>
+<pre><code>## Loading required package: signal</code></pre>
+<pre><code>## 
+## Attaching package: &#39;signal&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     filter, poly</code></pre>
+<pre class="r"><code>library(ggplot2)</code></pre>
+<pre><code>## Warning: package &#39;ggplot2&#39; was built under R version 3.5.3</code></pre>
+<pre class="r"><code>library(tidyr)
+library(dplyr)</code></pre>
+<pre><code>## Warning: package &#39;dplyr&#39; was built under R version 3.5.3</code></pre>
+<pre><code>## 
+## Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:signal&#39;:
+## 
+##     filter</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>channel &lt;- &quot;P8&quot;
+srate &lt;- 250
+timepoints &lt;- seq(-0.2,0.5,by=(1/srate))
+subj=1
+
+ERPdata &lt;- data.frame(matrix(ncol = 4, nrow = 0))
+colnames(ERPdata) &lt;- c(&quot;Subject&quot;, &quot;Condition&quot;, &quot;timepoints&quot;, &quot;voltages&quot;)
+
+sim1 &lt;- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,1,1,1), tshift = rep(0,5))
+sim2 &lt;- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,40,1,1), tshift = rep(0,5))
+
+erp1 &lt;- data.frame(Subject = as.character(subj), Condition = &quot;Contra&quot;, timepoints=timepoints, voltages =sim1)
+erp2 &lt;- data.frame(Subject = as.character(subj), Condition = &quot;Ipsi&quot;, timepoints=timepoints, voltages =sim2)
+ERPdata &lt;- rbind(erp1,erp2)
+
+
+ERPdata %&gt;%
+  ggplot(., aes(x=timepoints, y=voltages, colour = Condition)) +
+  scale_y_reverse() +
+  geom_line()</code></pre>
+<p><img src="/post/2018-10-25-erp-data-in-r_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<pre class="r"><code>ERPdata %&gt;%
+  spread(Condition, voltages) %&gt;%
+  mutate(diff = Contra-Ipsi) %&gt;%
+  ggplot(., aes(x=timepoints, y=diff)) +
+  scale_y_reverse() +
+  geom_line()</code></pre>
+<p><img src="/post/2018-10-25-erp-data-in-r_files/figure-html/unnamed-chunk-2-2.png" width="672" /></p>
+<pre class="r"><code>library(eegkit)
+library(ggplot2)
+library(tuneR)</code></pre>
+<pre><code>## Warning: package &#39;tuneR&#39; was built under R version 3.5.3</code></pre>
+<pre class="r"><code>channel &lt;- &quot;P8&quot;
+srate &lt;- 250
+timepoints &lt;- seq(-0.2,0.5,by=(1/srate))
+
+ERPdata &lt;- data.frame(matrix(ncol = 4, nrow = 0))
+colnames(ERPdata) &lt;- c(&quot;Subject&quot;, &quot;Condition&quot;, &quot;timepoints&quot;, &quot;voltages&quot;)
+for (subj in c(1:10)) {
+  subjCoefs = runif(1, min=-0.5, max=1.5)
+sim1 &lt;- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,1,1,1)*subjCoefs, tshift = rep(0,5)) + noise(kind = c(&quot;red&quot;), duration = length(timepoints), bit = 64)@left*5#rnorm(length(timepoints))*2
+sim2 &lt;- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,1,1,3)*subjCoefs, tshift = rep(0,5)) + noise(kind = c(&quot;red&quot;), duration = length(timepoints), bit = 64)@left*5#rnorm(length(timepoints))*2
+
+erp1 &lt;- data.frame(Subject = as.character(subj), Condition = &quot;One&quot;, timepoints=timepoints, voltages =sim1)
+erp2 &lt;- data.frame(Subject = as.character(subj), Condition = &quot;Two&quot;, timepoints=timepoints, voltages =sim2)
+ERPdata &lt;- rbind(ERPdata,erp1,erp2)
+}
+
+ERPdata %&gt;%
+  ggplot(., aes(x=timepoints, y=voltages, colour = Subject)) +
+  geom_line() +
+  facet_grid(Condition~.)</code></pre>
+<p><img src="/post/2018-10-25-erp-data-in-r_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+<pre class="r"><code>ERPdata %&gt;%
+  group_by(timepoints, Condition) %&gt;%
+  summarise(voltages = mean(voltages)) %&gt;%
+  ggplot(., aes(x=timepoints, y=voltages, colour = Condition)) +
+  geom_line() </code></pre>
+<p><img src="/post/2018-10-25-erp-data-in-r_files/figure-html/unnamed-chunk-3-2.png" width="672" /></p>
+<pre class="r"><code>#eegkitdata::geteegdata(indir=&quot;C:/Users/dionh/Documents/EEG data/SMNI_CMI_TRAIN/&quot;,outdir=&quot;C:/Users/dionh/Documents/EEG data/&quot;, cond=&quot;S1&quot;,filename=&quot;eegtrainS1&quot;)</code></pre>
+<p>I’m just going to start by announcing that I don’t know very much about R. If you do, this will probably become obvious to you as you read what I do but at least for now, I’m going to try and represent my ERP data in a long table.</p>
+<p>I have a pile of data that I collected a few years ago which will be perfect for this. You may be thinking, “well if you’ve got all of the raw data then just load that into R and do everything there.”, and if you are thinking that, then you’re crazy. While it is technically possible to load raw EEG data into R and perform most preprocessing steps, at this stage you’re on a very steep hill pushing a very heavy boulder. Personally, I’m not enough of a sadist for that. What I’m going to do is tidy all of the data up using eeglab, and then create a text file which will hold all of the single trial epochs, and all channels, for all condiitons and participants.</p>
+<p>The basic pipeline I like looks like this:
+- filter
+- interpolate bad channels
+- re-reference
+- remove epochs with large artefacts (to improve ICA decomposition)
+- run ICA using the pca option to reduce to 32 components
+- reject epochs with problematic horizontal eye movements (especially important for my paradigm that these are not just corrected by ICA)
+- reject artefact ICA components
+- throw away any noisy epochs that remain (+/- 100)</p>
+<p>One thing that I don’t like about this is that you end up with different trial numbers per person, per condition. I think I would prefer to use a pipeline that cleans the epochs as much as possible, but doesn’t throw anything out before it is loaded in R. I’ll do some simple epoch rejection in R when needed. This means that I end up with a slightly convoluted pipeline but it gives me something a little more flexible down the line.</p>
+<p>The new pipeline looks like this:
+- filter
+- interpolate bad channels
+- re-reference
+- remove epochs with large artefacts but store these so they can be added back later. It’s still necessary to do this step in order to improve the ICA decomposition.
+- run ICA using the pca option to reduce to 32 components
+- Store the HEOG for each trial. This is still necessary to do because of my paradigm, and I won’t be able to get this information from the HEOG later because ICA is about to clean the data, probably throwing out HEOG activity in the process.
+- reject artefact ICA components</p>
