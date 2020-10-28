@@ -1,0 +1,74 @@
+---
+title: NZ election
+author: Dion Henare
+date: '2020-10-28'
+slug: nz-election
+categories: []
+tags: []
+Categories:
+  - Development
+  - GoLang
+Description: ''
+Tags:
+  - Development
+  - golang
+menu: main
+---
+
+```{r options}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(include = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r loadElectionData}
+suppressWarnings(source("Data/NZ/ScrapeData.R"))
+```
+
+```{r analysisSetup}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+MPrty = ElectionData$Party[15]
+mainParties = c("New Zealand First Party","Labour Party","National Party","Green Party","ACT New Zealand", MPrty)
+maoriElecs = c( "Hauraki-Waikato","Ikaroa-Rawhiti","Tamaki Makaurau","Te Tai Hauauru","Te Tai Tokerau","Te Tai Tonga","Waiariki")
+
+#Add vote totals per electorate
+Totals <- ElectionData %>%
+  gather("VoteType","VoteCount", CandidateVotes,PartyVotes) %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party)) %>%
+  mutate(Year = ifelse(Year==2020,"Twenty","Seventeen")) %>%
+  group_by(Electorate, Year, VoteType) %>%
+  summarise(VoteTotal = sum(VoteCount, na.rm = TRUE))
+ElectionData <- ElectionData %>% 
+  gather("VoteType","VoteCount", CandidateVotes,PartyVotes)
+for (index in 1:length(ElectionData$VoteCount)) {
+  CurrentYear = ifelse(ElectionData$Year[index]==2020,"Twenty","Seventeen")
+  ElectionData$Total[index] = Totals %>% ungroup() %>% filter(Electorate == ElectionData$Electorate[index], Year == CurrentYear, VoteType == ElectionData$VoteType[index]) %>% pull(VoteTotal)
+}
+```
+
+```{r , include=TRUE}
+ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates")%>%
+  group_by(Party,Electorate,Year,VoteType) %>%
+  summarise(VoteCount = sum(VoteCount, na.rm = TRUE), Total = mean(Total)) %>%
+  ungroup() %>%
+  filter((Electorate %in% maoriElecs)) %>%
+  mutate(Percent = (VoteCount/Total)*100) %>%
+  ggplot(., aes(x=Party, y=Percent, group= Year, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge") +
+  facet_grid(Electorate~VoteType) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  theme(axis.text.x = element_text(angle = 90),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        panel.spacing.x = unit(2, "lines"))
+```
