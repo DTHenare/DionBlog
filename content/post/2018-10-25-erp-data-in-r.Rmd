@@ -16,7 +16,13 @@ Description: ''
 Tags:
   - Development
   - golang
+draft: TRUE
 ---
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(include = FALSE)
+```
 
 What I want to do more than anything else in the world, is analyse ERP data using R. The details of what I want to do are still a little murky, but first things first, I need data. What I'm going to do in this post is outline an ERP dataset that I think will work well in R, and retains lots of information so that I can run all kinds of cockamamey analyses later on.
 
@@ -50,7 +56,9 @@ sim2 <- eegsim(rep(channel,length(timepoints)),timepoints, coefs = c(1,1,40,1,1)
 erp1 <- data.frame(Subject = as.character(subj), Condition = "Contra", timepoints=timepoints, voltages =sim1)
 erp2 <- data.frame(Subject = as.character(subj), Condition = "Ipsi", timepoints=timepoints, voltages =sim2)
 ERPdata <- rbind(erp1,erp2)
+```
 
+```{r simplots, include = TRUE}
 
 ERPdata %>%
   ggplot(., aes(x=timepoints, y=voltages, colour = Condition)) +
@@ -86,6 +94,9 @@ erp1 <- data.frame(Subject = as.character(subj), Condition = "One", timepoints=t
 erp2 <- data.frame(Subject = as.character(subj), Condition = "Two", timepoints=timepoints, voltages =sim2)
 ERPdata <- rbind(ERPdata,erp1,erp2)
 }
+```
+
+```{r simplotsNoise, include = TRUE}
 
 ERPdata %>%
   ggplot(., aes(x=timepoints, y=voltages, colour = Subject)) +
