@@ -22,7 +22,7 @@ knitr::opts_chunk$set(warning = FALSE)
 ```
 
 ```{r loadElectionData}
-suppressWarnings(source("Data/NZ/ScrapeData.R"))
+ElectionData <- readRDS(file="Data/NZ/ElectionData.Rda")
 ```
 
 ```{r analysisSetup}
