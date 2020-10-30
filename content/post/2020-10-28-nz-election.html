@@ -1,5 +1,5 @@
 ---
-title: NZ election
+title: Was Labour's Landslide Caused By Tactical National Voters?
 author: Dion Henare
 date: '2020-10-28'
 slug: nz-election
@@ -17,4 +17,42 @@ menu: main
 
 
 
-<p><img src="/post/2020-10-28-nz-election_files/figure-html/plotdisplay-1.png" width="672" /></p>
+<p>For National party supporters watching Labour’s historic win in the most recent election, there aren’t many places to go for consolation. If you’re Nikki Kaye, you might take up Hilary Barry’s offer of a pack of girl guide biscuits. Online, however, it was more common to hear echoes of “tactical voting” to explain away Labour’s parliamentary majority.</p>
+<p>The idea makes a lot of intuitive sense. If voters on the right had no chance of controlling the government then there were really only two possible outcomes. Either the centre-left Labour party governs on its own with an outright majority, or they govern in a coalition with the further left Green party. And so, it’s been claimed, in a last ditch attempt to prevent the government from moving too far left, a significant portion of National voters decided to give their party vote to Labour in order to freeze out the Greens.</p>
+<p>If you buy the “tactical Nats” argument then you take consolation from the belief that Labour doesn’t actually have the support of 49.1% of the country’s voters. Some significant portion of those votes are actually just tactical votes from National supporters. Unfortunately, evidence of this has been limited to anecdotes about how “a lot of people I talked to said…” rather than anything substantive. And while it’s impossible to find out exactly how many people engaged in this kind of tactical voting, I think there might be ways to look at voting patterns and see whether we can find any evidence of it happening at scale.</p>
+<div id="the-results-so-far" class="section level1">
+<h1>The results (so far)</h1>
+<p>First we want to get a brief look at the results as they stand at the moment (specials aren’t counted as of writing).</p>
+<p><img src="/post/2020-10-28-nz-election_files/figure-html/electionSummaryPlot-1.png" width="1344" /></p>
+<p>On the left you can see each party’s share of the party vote across the country, and on the right, the number of seats this gets them in parliament. In the plot on the right I’ve also marked the threshold for a parliamentary majority - a party can govern alone when their number of seats goes above 60.</p>
+<p>Now we need to actually specify, in practical terms, the “tactical Nats” hypothesis. I think most people would agree that at least one National supporter likely voted tactically, maybe even 10, or 100, or 1000. But that wouldn’t be particularly noteworthy in itself. In the context of this discussion, the presence or absence of tactical voting is interesting only insofar as it impacts on the actual outcome of the election.</p>
+<p>Additionally, in this case I think the claim is more specific. Tactical Nats are purported to be responsible for the landslide nature of the results. The idea, as I understand it, is that they already believed that Labour had the possibility of a parliamentary majority on its own, and that National voters voted tactically to guarantee that majority. Therefore, functionally, tactical voting in this view accounts for at least 3 (and up to 4) of Labour’s 64 seats in parliament today.</p>
+</div>
+<div id="what-does-tactical-voting-look-like" class="section level1">
+<h1>What does tactical voting look like?</h1>
+<p>Given that we can’t ask every voter what their strategy was when entering the voting booth, we need to find ways to infer tactical voting from the results of the election. A good place to start would be the most prominent, and explicit example of tactical voting in New Zealand politics; Epsom. As a point of comparison, first I’ll show the electorate votes and the party votes for the entire country in the 2017 election:</p>
+<p><img src="/post/2020-10-28-nz-election_files/figure-html/election2017SummaryPlot-1.png" width="1344" /></p>
+<p>What we see is a pretty strong correspondence between electorate vote share and party vote share. On average, if you support a party, you will give them your party vote and you will give their candidate your electorate vote. Compare this to the same data taken from Epsom in 2017:</p>
+<p><img src="/post/2020-10-28-nz-election_files/figure-html/epsom2017SummaryPlot-1.png" width="1344" /></p>
+<p>It’s an open secret that in Epsom, the National party and ACT collude in order to inflate the representation of right wing voters in parliament. The long and short of it is that National supporters are encouraged to give the ACT candidate their electorate vote and we see this reflected in the data. National voters follow the instruction and give ACT their electorate vote, but the true political preferences of the electorate can be seen in their party vote. Tactical vote splitting is therefore signalled by the large discrepancy between electorate and party vote share. If we look back at elections since 2005 (when this arrangement began) and focus on just the National and ACT votes, we can see that the discrepancy is consistent across time:</p>
+<p><img src="/post/2020-10-28-nz-election_files/figure-html/tacticalEpsomPlot-1.png" width="672" /></p>
+<p>While Epsom is the most stark example of tactical voting because of its top-down organisation, it’s not the only place where we see evidence of tactical voting. A more organic version of this from 2017 can be observed in the 7 Maori electorates:</p>
+<p><img src="/post/2020-10-28-nz-election_files/figure-html/maori2017Elecs-1.png" width="672" /></p>
+<p>The results are a little messier because right wing parties don’t stand candidates in the Maori electorates so their supporters’ electorate votes get dispersed unpredictably amoungst the limited remaining options. However, in general we can see roughly the same pattern of tactical voting. While the Labour party gains the vast majority of party votes, their candidate typically loses some of that share. In the Maori electorates this is to the benefit of the Maori party (and in 2017, Mana’s Hone Harawira in Te Tai Tokerau) who receive a small portion of the party vote but a much higher share for their candidates. The take away point here is that once again, we see a discrepancy between the electorate votes and the party votes signalling tactical voting by Maori.</p>
+<p>If we want to measure tactical voting then a first step might be to calculate, for every electorate, the discrepancy between each candidate’s electorate votes, and their party’s votes. We can do this for all candidates in an electorate and sum the discrepancies together to get a single value that indexes the amount of tactical vote splitting going on in an electorate. If we do this for every electorate in 2017 and rank them from highest tactical voting to least, we get this:</p>
+<p><img src="/post/2020-10-28-nz-election_files/figure-html/TacticalRankPlot-1.png" width="672" /></p>
+<p>The results reflect what we should expect to see. Epsom has the highest amount of vote splitting, followed by the Maori electorates. The next two, Northland and Mt Albert make some sense. In each of these electorates one of the candidates was a party leader (Winston Peters in Northland, Jacinda Ardern in Mt Albert) and therefore some portion of National supporters split their vote and gave their electorate vote to the leader running in their electorate. Ilam at the high end also makes sense given that in 2017 there was a popular independent candidate who came in second to Gerry Brownlee. A popular independent will necessitate vote splitting because they have no party to vote for. At the lower end we see centre party strongholds. Manurewa and Mangere are strong Labour electorates and therefore there’s little vote splitting occurring, predominantly two ticks for Labour. A similar situation for National in Tauranga, Tamaki, and Clutha-Southland.</p>
+</div>
+<div id="tactical-voting-in-2020" class="section level1">
+<h1>Tactical voting in 2020</h1>
+</div>
+<div id="comparing-2020-to-2017" class="section level1">
+<h1>Comparing 2020 to 2017</h1>
+<p>the difference in results between 2017 and 2020. Here you can see the number of seats won by each party in the 2017 and 2020 elections, as well as their share of the party vote:</p>
+<p><img src="/post/2020-10-28-nz-election_files/figure-html/electionComparisonSummaryPlot-1.png" width="1344" /></p>
+<p>Another way to visualise the results is to plot the change in seats and vote share by subtracting 2017 results from 2020:</p>
+<p><img src="/post/2020-10-28-nz-election_files/figure-html/electionSummaryChangePlot-1.png" width="1344" /></p>
+</div>
+<div id="uncategorised" class="section level1">
+<h1>Uncategorised</h1>
+</div>

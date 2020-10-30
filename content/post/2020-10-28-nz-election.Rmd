@@ -1,5 +1,5 @@
 ---
-title: NZ election
+title: Was Labour's Landslide Caused By Tactical National Voters?
 author: Dion Henare
 date: '2020-10-28'
 slug: nz-election
@@ -19,6 +19,11 @@ menu: main
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(include = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
+
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
 ```
 
 ```{r loadElectionData}
@@ -26,10 +31,6 @@ ElectionData <- readRDS(file="Data/NZ/ElectionData.Rda")
 ```
 
 ```{r analysisSetup}
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-
 MPrty = ElectionData$Party[15]
 mainParties = c("New Zealand First Party","Labour Party","National Party","Green Party","ACT New Zealand", MPrty)
 maoriElecs = c( "Hauraki-Waikato","Ikaroa-Rawhiti","Tamaki Makaurau","Te Tai Hauauru","Te Tai Tokerau","Te Tai Tonga","Waiariki")
@@ -49,8 +50,471 @@ for (index in 1:length(ElectionData$VoteCount)) {
 }
 ```
 
-```{r}
-plotmake <- ElectionData %>%
+For National party supporters watching Labour's historic win in the most recent election, there aren't many places to go for consolation. If you're Nikki Kaye, you might take up Hilary Barry's offer of a pack of girl guide biscuits. Online, however, it was more common to hear echoes of "tactical voting" to explain away Labour's parliamentary majority. 
+
+The idea makes a lot of intuitive sense. If voters on the right had no chance of controlling the government then there were really only two possible outcomes. Either the centre-left Labour party governs on its own with an outright majority, or they govern in a coalition with the further left Green party. And so, it's been claimed, in a last ditch attempt to prevent the government from moving too far left, a significant portion of National voters decided to give their party vote to Labour in order to freeze out the Greens.
+
+If you buy the "tactical Nats" argument then you take consolation from the belief that Labour doesn't actually have the support of 49.1% of the country's voters. Some significant portion of those votes are actually just tactical votes from National supporters. Unfortunately, evidence of this has been limited to anecdotes about how "a lot of people I talked to said..." rather than anything substantive. And while it's impossible to find out exactly how many people engaged in this kind of tactical voting, I think there might be ways to look at voting patterns and see whether we can find any evidence of it happening at scale.
+
+# The results (so far)
+
+First we want to get a brief look at the results as they stand at the moment (specials aren't counted as of writing).
+
+```{r election2020Summary}
+#Create data
+parties <- c("National", "Labour", "NZF", "Green", "ACT", "Maori", "Other")
+seats2020 <- c(35, 64, 0, 10, 10, 1, 0)
+frame2020 <- data.frame(Party = parties, seats = seats2020)
+frame2020$Year <- 2020
+
+#Tidy data
+seatsData <- frame2020
+seatsData <- seatsData %>%
+  mutate(Party =factor(Party, levels = c("Green", "Maori", "Labour", "NZF", "National", "ACT", "Other")),
+         Year = as.factor(Year)) 
+  
+#Make plot of seta numbers
+seatsplot <- ggplot() +
+  geom_bar(data = seatsData, aes(x=Party, y=seats, fill =Party), stat="identity", position = "dodge", alpha = 0.7) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  geom_hline(yintercept = 60) +
+  ylab("Seats in Parliament") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+
+#Make plot of party vote
+partyVotePlot <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(VoteType == "PartyVotes", Year == "2020") %>%
+  group_by(Party) %>%
+  summarise(PartyVote = sum(VoteCount, na.rm = TRUE), Total = sum(Total, na.rm = TRUE), Percent = PartyVote/Total*100) %>%
+  ggplot(., aes(x=Party, y=Percent, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  ylab("Share of Party Vote (%)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+layout = "
+AAABCCC
+"
+```
+
+```{r electionSummaryPlot, include=TRUE, fig.width = 14, fig.height = 7}
+partyVotePlot + plot_spacer() + seatsplot +
+  plot_layout(design = layout)
+```
+
+On the left you can see each party's share of the party vote across the country, and on the right, the number of seats this gets them in parliament. In the plot on the right I've also marked the threshold for a parliamentary majority - a party can govern alone when their number of seats goes above 60. 
+
+Now we need to actually specify, in practical terms, the "tactical Nats" hypothesis. I think most people would agree that at least one National supporter likely voted tactically, maybe even 10, or 100, or 1000. But that wouldn't be particularly noteworthy in itself. In the context of this discussion, the presence or absence of tactical voting is interesting only insofar as it impacts on the actual outcome of the election. 
+
+Additionally, in this case I think the claim is more specific.`r #In order to provide reasonable consolation to National party supporters, tactical voting needs to be responsible for the parliamentary majority that Labour achieved.` Tactical Nats are purported to be responsible for the landslide nature of the results. The idea, as I understand it, is that they already believed that Labour had the possibility of a parliamentary majority on its own, and that National voters voted tactically to guarantee that majority. Therefore, functionally, tactical voting in this view accounts for at least 3 (and up to 4) of Labour's 64 seats in parliament today. 
+
+# What does tactical voting look like?
+
+Given that we can't ask every voter what their strategy was when entering the voting booth, we need to find ways to infer tactical voting from the results of the election. A good place to start would be the most prominent, and explicit example of tactical voting in New Zealand politics; Epsom. As a point of comparison, first I'll show the electorate votes and the party votes for the entire country in the 2017 election:
+
+```{r election2017summary}
+#Make plot of party vote
+partyVotePlot <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(VoteType == "PartyVotes", Year == "2017") %>%
+  group_by(Party) %>%
+  summarise(PartyVote = sum(VoteCount, na.rm = TRUE), Total = sum(Total, na.rm = TRUE), Percent = PartyVote/Total*100) %>%
+  ggplot(., aes(x=Party, y=Percent, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  ylab("Share of Party Vote (%)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+
+electorateVotePlot <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(VoteType == "CandidateVotes", Year == "2017") %>%
+  group_by(Party) %>%
+  summarise(PartyVote = sum(VoteCount, na.rm = TRUE), Total = sum(Total, na.rm = TRUE), Percent = PartyVote/Total*100) %>%
+  ggplot(., aes(x=Party, y=Percent, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  ylab("Share of Electorate Vote (%)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+layout = "
+AAABCCC
+"
+```
+
+```{r election2017SummaryPlot, include=TRUE, fig.width = 14, fig.height = 7}
+electorateVotePlot + plot_spacer() + partyVotePlot +
+  plot_layout(design = layout)
+```
+
+What we see is a pretty strong correspondence between electorate vote share and party vote share. On average, if you support a party, you will give them your party vote and you will give their candidate your electorate vote. Compare this to the same data taken from Epsom in 2017:
+
+```{r epsom2017}
+#Make plot of party vote
+partyVotePlot <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(VoteType == "PartyVotes", Year == "2017", Electorate == "Epsom") %>%
+  group_by(Party) %>%
+  summarise(PartyVote = sum(VoteCount, na.rm = TRUE), Total = sum(Total, na.rm = TRUE), Percent = PartyVote/Total*100) %>%
+  ggplot(., aes(x=Party, y=Percent, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  ylim(0,60) +
+  ylab("Share of Party Vote (%)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+
+electorateVotePlot <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(VoteType == "CandidateVotes", Year == "2017", Electorate == "Epsom") %>%
+  group_by(Party) %>%
+  summarise(PartyVote = sum(VoteCount, na.rm = TRUE), Total = sum(Total, na.rm = TRUE), Percent = PartyVote/Total*100) %>%
+  ggplot(., aes(x=Party, y=Percent, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  ylim(0,60) +
+  ylab("Share of Electorate Vote (%)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+layout = "
+AAABCCC
+"
+```
+
+```{r epsom2017SummaryPlot, include=TRUE, fig.width = 14, fig.height = 7}
+electorateVotePlot + plot_spacer() + partyVotePlot +
+  plot_layout(design = layout)
+```
+
+It's an open secret that in Epsom, the National party and ACT collude in order to inflate the representation of right wing voters in parliament. The long and short of it is that National supporters are encouraged to give the ACT candidate their electorate vote and we see this reflected in the data. National voters follow the instruction and give ACT their electorate vote, but the true political preferences of the electorate can be seen in their party vote. Tactical vote splitting is therefore signalled by the large discrepancy between electorate and party vote share. If we look back at elections since 2005 (when this arrangement began) and focus on just the National and ACT votes, we can see that the discrepancy is consistent across time:
+
+```{r epsomTactical}
+epsomData <- readRDS(file="Data/NZ/EpsomData.Rda")
+#epsomMainParties <- c("Labour Party","National Party","Green Party","ACT New Zealand")
+epsomMainParties <- c("National Party","ACT New Zealand")
+
+Totals <- epsomData %>%
+  gather("VoteType","VoteCount", CandidateVotes,PartyVotes) %>%
+  mutate(Party = ifelse(!(Party %in% epsomMainParties),"Other",Party)) %>%
+  #mutate(Year = ifelse(Year=="2020","Twenty","Seventeen")) %>%
+  group_by(Electorate,Year, VoteType) %>%
+  summarise(VoteTotal = sum(VoteCount, na.rm = TRUE))
+epsomData <- epsomData %>% 
+  gather("VoteType","VoteCount", CandidateVotes,PartyVotes)
+for (index in 1:length(epsomData$VoteCount)) {
+  CurrentYear = epsomData$Year[index]
+  epsomData$Total[index] = Totals %>% ungroup() %>% filter(Electorate == epsomData$Electorate[index], Year == CurrentYear, VoteType == epsomData$VoteType[index]) %>% pull(VoteTotal)
+}
+
+tacticalEpsom <- epsomData %>%
+  mutate(Party = ifelse(!(Party %in% epsomMainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("National Party", "ACT New Zealand"))) %>%
+  select(-"Candidates")%>%
+  filter(Party %in% epsomMainParties) %>%
+  group_by(Party,Year,VoteType) %>%
+  summarise(VoteCount = sum(VoteCount, na.rm = TRUE), Total = mean(Total)) %>%
+  ungroup() %>%
+  mutate(Percent = (VoteCount/Total)*100) %>%
+  ggplot(., aes(x=VoteType, y=Percent, group = Party, fill =Party)) +
+  geom_bar(stat="identity", position=position_dodge(width=0.7), alpha = 0.7) +
+  scale_x_discrete(labels = c("Electorate Vote", "Party Vote")) +
+  facet_wrap(~Year, ncol = 3) +
+  scale_fill_manual(values=c("royalblue3", "gold")) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        panel.spacing.x = unit(2, "lines"),
+        legend.position = "None",
+        strip.background = element_rect(fill = "white"),
+        axis.title.x = element_blank())
+```
+
+```{r tacticalEpsomPlot, include=TRUE, fig.width = 7, fig.height = 3.5}
+tacticalEpsom
+```
+
+While Epsom is the most stark example of tactical voting because of its top-down organisation, it's not the only place where we see evidence of tactical voting. A more organic version of this from 2017 can be observed in the 7 Maori electorates:
+
+```{r maori2017Elecs, include = TRUE, fig.width = 7, fig.height = 14}
+#Plot showing the vote percentages by party for the candidate votes and party vots in each maori electorate
+ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates")%>%
+  group_by(Party,Electorate,Year,VoteType) %>%
+  summarise(VoteCount = sum(VoteCount, na.rm = TRUE), Total = mean(Total)) %>%
+  ungroup() %>%
+  filter((Electorate %in% maoriElecs), Year == "2017") %>%
+  mutate(Percent = (VoteCount/Total)*100) %>%
+  ggplot(., aes(x=Party, y=Percent, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  facet_grid(Electorate~VoteType) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        panel.spacing.x = unit(2, "lines"),
+        legend.position = "None",
+        strip.background = element_rect(fill = "white"),
+        strip.text.y = element_text(angle=0))
+```
+
+The results are a little messier because right wing parties don't stand candidates in the Maori electorates so their supporters' electorate votes get dispersed unpredictably amoungst the limited remaining options. However, in general we can see roughly the same pattern of tactical voting. While the Labour party gains the vast majority of party votes, their candidate typically loses some of that share. In the Maori electorates this is to the benefit of the Maori party (and in 2017, Mana's Hone Harawira in Te Tai Tokerau) who receive a small portion of the party vote but a much higher share for their candidates. The take away point here is that once again, we see a discrepancy between the electorate votes and the party votes signalling tactical voting by Maori.
+
+If we want to measure tactical voting then a first step might be to calculate, for every electorate, the discrepancy between each candidate's electorate votes, and their party's votes. We can do this for all candidates in an electorate and sum the discrepancies together to get a single value that indexes the amount of tactical vote splitting going on in an electorate. If we do this for every electorate in 2017 and rank them from highest tactical voting to least, we get this:
+
+```{r tactical2017Rank, include = TRUE}
+Winners <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(Year == "2017") %>%
+  group_by(Party, Electorate, VoteType) %>%
+  summarise(VoteCount = sum(VoteCount, na.rm = TRUE), Total = mean(Total, na.rm = TRUE)) %>%
+  mutate(Percent = VoteCount/Total*100) %>%
+  select(-c("VoteCount", "Total")) %>%
+  spread(VoteType,Percent) %>%
+  mutate(PartySupport =  PartyVotes) %>%
+  group_by(Electorate) %>%
+  filter(PartySupport == max(PartySupport))
+
+TacticalData <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(Year == "2017") %>%
+  group_by(Party, Electorate, VoteType) %>%
+  summarise(VoteCount = sum(VoteCount, na.rm = TRUE), Total = mean(Total, na.rm = TRUE)) %>%
+  mutate(Percent = VoteCount/Total*100) %>%
+  select(-c("VoteCount", "Total")) %>%
+  spread(VoteType,Percent) %>%
+  mutate(Discrepancy = abs(CandidateVotes-PartyVotes)) %>%
+  group_by(Electorate) %>%
+  summarise(TacticalSum = sum(Discrepancy), TacticalMean = mean(Discrepancy)) %>%
+  filter(!is.na(TacticalMean))
+
+for (electorate in TacticalData$Electorate) {
+  TacticalData$Winner[TacticalData$Electorate==electorate] = as.character(Winners$Party[Winners$Electorate==electorate])
+}
+TacticalData$Winner = as.factor(TacticalData$Winner)
+
+TacticalRankPlot <- ggplot(TacticalData, aes(x=reorder(Electorate,-TacticalSum), y=TacticalSum, fill = Winner)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values=c("red3", "royalblue3")) +
+  labs(y= "Vote Splitting Score") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.4),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+```
+
+```{r TacticalRankPlot, include = TRUE, fig.width = 7, fig.height = 3.5}
+TacticalRankPlot
+```
+
+The results reflect what we should expect to see. Epsom has the highest amount of vote splitting, followed by the Maori electorates. The next two, Northland and Mt Albert make some sense. In each of these electorates one of the candidates was a party leader (Winston Peters in Northland, Jacinda Ardern in Mt Albert) and therefore some portion of National supporters split their vote and gave their electorate vote to the leader running in their electorate.`r #we might expect to see an additional bump for the leader as a candidate, over and above their general party support.` Ilam at the high end also makes sense given that in 2017 there was a popular independent candidate who came in second to Gerry Brownlee. A popular independent will necessitate vote splitting because they have no party to vote for. At the lower end we see centre party strongholds. Manurewa and Mangere are strong Labour electorates and therefore there's little vote splitting occurring, predominantly two ticks for Labour. A similar situation for National in Tauranga, Tamaki, and Clutha-Southland. 
+
+# Tactical voting in 2020
+
+
+
+# Comparing 2020 to 2017
+
+the difference in results between 2017 and 2020. Here you can see the number of seats won by each party in the 2017 and 2020 elections, as well as their share of the party vote:
+
+```{r electionComparisonSummary}
+#Create data
+parties <- c("National", "Labour", "NZF", "Green", "ACT", "Maori", "Other")
+seats2017 <- c(56, 46, 9, 8, 1, 0, 0)
+frame2017 <- data.frame(Party = parties, seats = seats2017)
+frame2017$Year <- 2017
+
+seats2020 <- c(35, 64, 0, 10, 10, 1, 0)
+frame2020 <- data.frame(Party = parties, seats = seats2020)
+frame2020$Year <- 2020
+
+#bind years
+seatsData <- rbind(frame2017,frame2020)
+seatsData <- seatsData %>%
+  mutate(Party =factor(Party, levels = c("Green", "Maori", "Labour", "NZF", "National", "ACT", "Other")),
+         Year = as.factor(Year)) 
+  
+#Make plot of seta numbers
+seatsplot <- ggplot() +
+  geom_bar(data = seatsData, aes(x=Year, y=seats, fill =Party), stat="identity", position = "dodge", alpha = 0.7) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  geom_hline(yintercept = 60) +
+  ylab("Seats in Parliament") +
+  facet_grid(~Party,
+             scales = "free_x", # Let the x axis vary across facets.
+             space = "free_x",  # Let the width of facets vary and force all bars to have the same width.
+             switch = "x") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        strip.text.x = element_text(angle=90),
+        strip.placement = "outside",                      # Place facet labels outside x axis labels.
+        strip.background = element_rect(fill = "white"),  # Make facet label background white.
+        axis.title.x = element_blank())
+
+#Make plot of party vote
+partyVotePlot <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(VoteType == "PartyVotes") %>%
+  group_by(Year,Party) %>%
+  summarise(PartyVote = sum(VoteCount, na.rm = TRUE), Total = sum(Total, na.rm = TRUE), Percent = PartyVote/Total*100) %>%
+  ggplot(., aes(x=Year, y=Percent, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  ylab("Share of Party Vote (%)") +
+  facet_grid(~Party,
+             scales = "free_x", # Let the x axis vary across facets.
+             space = "free_x",  # Let the width of facets vary and force all bars to have the same width.
+             switch = "x") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        strip.text.x = element_text(angle=90),
+        strip.placement = "outside",                      # Place facet labels outside x axis labels.
+        strip.background = element_rect(fill = "white"),  # Make facet label background white.
+        axis.title.x = element_blank())
+layout = "
+AAABCCC
+"
+```
+
+```{r electionComparisonSummaryPlot, include=TRUE, fig.width = 14, fig.height = 7}
+seatsplot + plot_spacer() + partyVotePlot +
+  plot_layout(design = layout)
+```
+
+Another way to visualise the results is to plot the change in seats and vote share by subtracting 2017 results from 2020:
+
+```{r electionSummaryDifference}
+#Make plot of seta numbers
+seatsplot <- seatsData %>%
+  mutate(Year = ifelse(Year == 2020, "Twenty", "Seventeen")) %>%
+  spread(Year, seats) %>%
+  mutate(Change = Twenty-Seventeen) %>%
+  ggplot(., aes(x=Party, y=Change, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  geom_text(aes(y = Change + 1 * sign(Change), label = Change), position=position_dodge(0.5)) + 
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  ylab("Change in Seats from 2017") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+
+#Make plot of party vote
+partyVotePlot <- ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates") %>%
+  filter(VoteType == "PartyVotes") %>%
+  group_by(Year,Party) %>%
+  summarise(PartyVote = sum(VoteCount, na.rm = TRUE), 
+            Total = sum(Total, na.rm = TRUE), 
+            Percent = PartyVote/Total*100) %>%
+  ungroup %>%
+  mutate(Year = ifelse(Year == "2020", "Twenty", "Seventeen")) %>%
+  select(-c("PartyVote", "Total")) %>%
+  spread(Year, Percent) %>%
+  mutate(Change = Twenty-Seventeen) %>%
+  ggplot(., aes(x=Party, y=Change, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  geom_text(aes(y = Change + 1.5 * sign(Change), label = paste(round(Change,2),"%",sep="")), position=position_dodge(0.5)) + 
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  ylab("Change in Party Vote from 2017 (%)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        text = element_text(size=20),
+        panel.background = element_blank(),
+        legend.position = "None",
+        axis.title.x = element_blank())
+layout = "
+AAABCCC
+"
+```
+
+```{r electionSummaryChangePlot, include=TRUE, fig.width = 14, fig.height = 7}
+seatsplot + plot_spacer() + partyVotePlot +
+  plot_layout(design = layout)
+```
+
+
+
+
+# Uncategorised
+```{r maoriElecs, include = FALSE, fig.width = 7, fig.height = 14}
+#Plot showing the vote percentages by party for the candidate votes and party vots in each maori electorate
+ElectionData %>%
   mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
          Party = as.factor(Party), 
          Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
@@ -63,16 +527,39 @@ plotmake <- ElectionData %>%
   filter((Electorate %in% maoriElecs)) %>%
   mutate(Percent = (VoteCount/Total)*100) %>%
   ggplot(., aes(x=Party, y=Percent, group= Year, fill =Party)) +
-  geom_bar(stat="identity", position = "dodge") +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
   facet_grid(Electorate~VoteType) +
   scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
-  theme(axis.text.x = element_text(angle = 90),
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
         panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(),
         panel.background = element_blank(),
-        panel.spacing.x = unit(2, "lines"))
+        panel.spacing.x = unit(2, "lines"),
+        strip.text.y = element_text(angle=0))
 ```
 
-```{r plotdisplay, include=TRUE}
-plotmake
+```{r generalElecs, include = FALSE, fig.width = 7, fig.height = 144}
+#Plot showing the vote percentages by party for the candidate votes and party vots in each maori electorate
+ElectionData %>%
+  mutate(Party = ifelse(!(Party %in% mainParties),"Other",Party), 
+         Party = as.factor(Party), 
+         Party =factor(Party, levels = c("Green Party", MPrty, "Labour Party", "New Zealand First Party", "National Party", "ACT New Zealand", "Other")), 
+         Year = as.factor(Year), 
+         Year = factor(Year, levels = c("2017","2020"))) %>%
+  select(-"Candidates")%>%
+  group_by(Party,Electorate,Year,VoteType) %>%
+  summarise(VoteCount = sum(VoteCount, na.rm = TRUE), Total = mean(Total)) %>%
+  ungroup() %>%
+  filter(!(Electorate %in% maoriElecs)) %>%
+  mutate(Percent = (VoteCount/Total)*100) %>%
+  ggplot(., aes(x=Party, y=Percent, group= Year, fill =Party)) +
+  geom_bar(stat="identity", position = "dodge", alpha = 0.7) +
+  facet_grid(Electorate~VoteType) +
+  scale_fill_manual(values=c("chartreuse4", "firebrick4", "red3", "grey14", "royalblue3", "gold", "grey40")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.3),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        panel.spacing.x = unit(2, "lines"),
+        strip.text.y = element_text(angle=0))
 ```
